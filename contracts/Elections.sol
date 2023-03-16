@@ -39,7 +39,11 @@ contract Elections is Ownable {
         for (uint i = 0; i < options.length; i++) {
             votingOptions.push(VoteOption({name: options[i], votes: 0}));
         }
-        setVotingPeriod(votingStart, votingEnd);
+        
+        require(block.timestamp < votingStart, "Start date is in the past");
+        require(votingStart < votingEnd, "Invalid dates passed");
+        votingParameters.start = votingStart;
+        votingParameters.end = votingEnd;
     }
 
     /**
@@ -104,7 +108,7 @@ contract Elections is Ownable {
         }
     }
 
-    function setVotingPeriod(uint votingStart, uint votingEnd) public onlyOwner {
+    function setVotingPeriod(uint votingStart, uint votingEnd) public onlyOwner beforeVoting {
         require(block.timestamp < votingStart, "Start date is in the past");
         require(votingStart < votingEnd, "Invalid dates passed");
         votingParameters.start = votingStart;
