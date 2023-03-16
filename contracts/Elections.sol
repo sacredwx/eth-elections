@@ -15,7 +15,7 @@ contract Elections is Ownable {
      * Modifiers
      */
 
-    modifier beforeVote() {
+    modifier beforeVoting() {
         require(
             block.timestamp < votingParameters.start,
             "Voting already started."
@@ -23,7 +23,7 @@ contract Elections is Ownable {
         _;
     }
 
-    modifier duringVote() {
+    modifier duringVoting() {
         require(
             block.timestamp >= votingParameters.start && block.timestamp < votingParameters.end,
             "Voting is not in process."
@@ -39,17 +39,14 @@ contract Elections is Ownable {
         for (uint i = 0; i < options.length; i++) {
             votingOptions.push(VoteOption({name: options[i], votes: 0}));
         }
-        votingParameters = VotingParameters({
-            start: votingStart,
-            end: votingEnd
-        });
+        setVotingPeriod(votingStart, votingEnd);
     }
 
     /**
      * External functions
      */
 
-    function vote(uint voteOption) external duringVote {
+    function vote(uint voteOption) external duringVoting {
         Voter storage voter = voters[msg.sender];
         require(voter.registered, "Has no right to vote");
         require(!voter.voted, "Already voted.");
@@ -91,7 +88,7 @@ contract Elections is Ownable {
      * Owner only
      */
 
-    function registerVoters(address[] memory addresses) external onlyOwner beforeVote {
+    function registerVoters(address[] memory addresses) external onlyOwner beforeVoting {
         for (uint i = 0; i < addresses.length; i++) {
             voters[addresses[i]] = Voter({
                 registered: true,
@@ -101,9 +98,16 @@ contract Elections is Ownable {
         }
     }
 
-    function deregisterVoters(address[] memory addresses) external onlyOwner beforeVote {
+    function deregisterVoters(address[] memory addresses) external onlyOwner beforeVoting {
         for (uint i = 0; i < addresses.length; i++) {
             delete voters[addresses[i]];
         }
+    }
+
+    function setVotingPeriod(uint votingStart, uint votingEnd) public onlyOwner {
+        require(block.timestamp < votingStart, "Start date is in the past");
+        require(votingStart < votingEnd, "Invalid dates passed");
+        votingParameters.start = votingStart;
+        votingParameters.end = votingEnd;
     }
 }
