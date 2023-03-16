@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity ^0.8.12;
 
 import "./VotingParameters.sol";
 import "./VoteOption.sol";
@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Elections is Ownable {
     mapping(address => Voter) public voters;
+    address[] public registeredVoters;
     VoteOption[] public votingOptions;
     VotingParameters public votingParameters;
 
@@ -88,23 +89,37 @@ contract Elections is Ownable {
         return votingOptions[winningOptionIndex()];
     }
 
+    /// Returns all voting options and its' data
+    function getVotingOptions() public view returns (VoteOption[] memory)
+    {
+        return votingOptions;
+    }
+
+    /// Returns the registered voters
+    /// @dev Pagination is used to prevent failure on large address sets
+    function getRegisteredVoters(uint start, uint end) public view returns(address[] memory)
+    {
+        address[] memory addresses = new address[](end-start);
+        uint j=0;
+        for (uint i = start; i < end; i++) {
+            addresses[j++] = registeredVoters[i];
+        }
+        return addresses;
+    }
+
     /**
      * Owner only
      */
 
     function registerVoters(address[] memory addresses) external onlyOwner beforeVoting {
         for (uint i = 0; i < addresses.length; i++) {
-            voters[addresses[i]] = Voter({
+            Voter memory voter = Voter({
                 registered: true,
                 voted: false,
                 vote: 0
             });
-        }
-    }
-
-    function deregisterVoters(address[] memory addresses) external onlyOwner beforeVoting {
-        for (uint i = 0; i < addresses.length; i++) {
-            delete voters[addresses[i]];
+            voters[addresses[i]] = voter;
+            registeredVoters.push(payable(addresses[i]));
         }
     }
 

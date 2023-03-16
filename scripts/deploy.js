@@ -3,13 +3,16 @@
 
 const path = require("path");
 
+const VOTING_DELAY = 200; // in Seconds
+const VOTING_DURATION = 300; // in Seconds
+
 async function main() {
   // This is just a convenience check
   if (network.name === "hardhat") {
     console.warn(
       "You are trying to deploy a contract to the Hardhat Network, which" +
-        "gets automatically created and destroyed every time. Use the Hardhat" +
-        " option '--network localhost'"
+      "gets automatically created and destroyed every time. Use the Hardhat" +
+      " option '--network localhost'"
     );
   }
 
@@ -22,17 +25,27 @@ async function main() {
 
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
-  const Token = await ethers.getContractFactory("Token");
-  const token = await Token.deploy();
-  await token.deployed();
+  const now = Math.floor(new Date().getTime() / 1000);
 
-  console.log("Token address:", token.address);
+  const Elections = await ethers.getContractFactory("Elections");
+  const elections = await Elections.deploy(
+    now + VOTING_DELAY,
+    now + VOTING_DELAY + VOTING_DURATION,
+    [
+      "option1",
+      "option2",
+      "option3",
+    ]
+  );
+  await elections.deployed();
+
+  console.log("Elections address:", elections.address);
 
   // We also save the contract's artifacts and address in the frontend directory
-  saveFrontendFiles(token);
+  saveFrontendFiles(elections);
 }
 
-function saveFrontendFiles(token) {
+function saveFrontendFiles(elections) {
   const fs = require("fs");
   const contractsDir = path.join(__dirname, "..", "frontend", "src", "contracts");
 
@@ -42,14 +55,14 @@ function saveFrontendFiles(token) {
 
   fs.writeFileSync(
     path.join(contractsDir, "contract-address.json"),
-    JSON.stringify({ Token: token.address }, undefined, 2)
+    JSON.stringify({ Elections: elections.address }, undefined, 2)
   );
 
-  const TokenArtifact = artifacts.readArtifactSync("Token");
+  const ElectionsArtifact = artifacts.readArtifactSync("Elections");
 
   fs.writeFileSync(
-    path.join(contractsDir, "Token.json"),
-    JSON.stringify(TokenArtifact, null, 2)
+    path.join(contractsDir, "Elections.json"),
+    JSON.stringify(ElectionsArtifact, null, 2)
   );
 }
 

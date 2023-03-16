@@ -1,6 +1,10 @@
 import React from "react";
 
-export function WaitingForTransactionMessage({ txHash }) {
+interface Props {
+  txHash: string,
+}
+
+export function WaitingForTransactionMessage({ txHash }: Props) {
   return (
     <div className="alert alert-info" role="alert">
       Waiting for transaction <strong>{txHash}</strong> to be mined

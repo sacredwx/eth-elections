@@ -1,9 +1,14 @@
 import React from "react";
 
-export function NetworkErrorMessage({ message, dismiss }) {
+interface Props {
+  message: string,
+  dismiss: () => void,
+}
+
+export function TransactionErrorMessage({ message, dismiss }: Props) {
   return (
     <div className="alert alert-danger" role="alert">
-      {message}
+      Error sending transaction: {message.substring(0, 100)}
       <button
         type="button"
         className="close"

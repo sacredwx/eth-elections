@@ -1,8 +1,15 @@
 import React from "react";
 
 import { NetworkErrorMessage } from "./NetworkErrorMessage";
+import { Button } from "@mui/material";
 
-export function ConnectWallet({ connectWallet, networkError, dismiss }) {
+interface Props {
+  connectWallet: () => void,
+  networkError: string | null,
+  dismiss: () => void,
+}
+
+export function ConnectWallet({ connectWallet, networkError, dismiss }:Props) {
   return (
     <div className="container">
       <div className="row justify-content-md-center">
@@ -17,13 +24,14 @@ export function ConnectWallet({ connectWallet, networkError, dismiss }) {
         </div>
         <div className="col-6 p-4 text-center">
           <p>Please connect to your wallet.</p>
-          <button
+          <Button
             className="btn btn-warning"
             type="button"
+            variant="contained"
             onClick={connectWallet}
           >
             Connect Wallet
-          </button>
+          </Button>
         </div>
       </div>
     </div>
