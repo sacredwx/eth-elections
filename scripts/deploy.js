@@ -3,8 +3,8 @@
 
 const path = require("path");
 
-const VOTING_DELAY = 200; // in Seconds
-const VOTING_DURATION = 300; // in Seconds
+const VOTING_DELAY = 300; // in Seconds
+const VOTING_DURATION = 1000; // in Seconds
 
 async function main() {
   // This is just a convenience check
@@ -26,6 +26,17 @@ async function main() {
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
   const now = Math.floor(new Date().getTime() / 1000);
+  console.log("Now: ", now);
+
+  console.log("Contract's Parameters: ",
+    now + VOTING_DELAY,
+    now + VOTING_DELAY + VOTING_DURATION,
+    [
+      "option1",
+      "option2",
+      "option3",
+    ]
+  );
 
   const Elections = await ethers.getContractFactory("Elections");
   const elections = await Elections.deploy(

@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import logo from './logo.svg';
 import './App.css';
 
 // We'll use ethers to interact with the Ethereum network and our contract
@@ -11,10 +10,14 @@ import ElectionsArtifact from "./contracts/Elections.json";
 import contractAddress from "./contracts/contract-address.json";
 import { NoWalletDetected } from './components/NoWalletDetected';
 import { ConnectWallet } from './components/ConnectWallet';
-import { _connectWallet } from './lib/eth';
 import { TransactionErrorMessage } from './components/TransactionErrorMessage';
 import { WaitingForTransactionMessage } from './components/WaitingForTransactionMessage';
 import { Box, Button, Grid, TextField, Typography } from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import Eth from './lib/Eth';
+import { DateTimePicker } from '@mui/x-date-pickers';
+import dayjs, { Dayjs } from 'dayjs';
 
 // This is an error code that indicates that the user canceled a transaction
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
@@ -27,9 +30,9 @@ declare global {
 
 // This is an utility method that turns an RPC error into a human readable
 // message.
-const _getRpcErrorMessage = (error: any) => {
-  if (error.data) {
-    return error.data.message;
+const getRpcErrorMessage = (error: any) => {
+  if (error.error && error.error.data) {
+    return error.error.data.message;
   }
 
   return error.message;
@@ -38,8 +41,10 @@ const _getRpcErrorMessage = (error: any) => {
 function App() {
   const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
-  const [transactionError, setTransactionError] = useState<string | null>(null);
+  const [transactionError, setTransactionError] = useState<any | null>(null);
   const [txBeingSent, setTxBeingSent] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<Dayjs | null>(null);
+  const [endTime, setEndTime] = useState<Dayjs | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [votingParameters, setVotingParameters] = useState<any>(null);
@@ -48,10 +53,10 @@ function App() {
   const [registeredVoters, setRegisteredVoters] = useState<any>(null);
   const [owner, setOwner] = useState<any>(null);
 
-  const whitelistAddressRef = useRef();
+  const whitelistAddressRef = useRef<any>();
 
   // This method is for the user to vote.
-  const vote = async (voteOption: number) => {
+  const sendTx = async (txAction: () => Promise<any>, postTxHook: () => void) => {
     if (!contract) {
       return;
     }
@@ -75,7 +80,7 @@ function App() {
 
       // We send the transaction, and save its hash in the Dapp's state. This
       // way we can indicate that we are waiting for it to be mined.
-      const tx = await contract.vote(voteOption);
+      const tx = await txAction();
       setTxBeingSent(tx.hash);
 
       // We use .wait() to wait for the transaction to be mined. This method
@@ -90,19 +95,18 @@ function App() {
       }
 
       // Update related data on page
-      contract?.getVotingOptions().then(setVotingOptions);
-      contract?.voters(selectedAddress).then(setVoter);
-    } catch (error) {
+      setTimeout(postTxHook, 3000);
+    } catch (error: any) {
       // We check the error code to see if this error was produced because the
       // user rejected a tx. If that's the case, we do nothing.
-      if ((error as any).code === ERROR_CODE_TX_REJECTED_BY_USER) {
+      if (error.code === ERROR_CODE_TX_REJECTED_BY_USER) {
         return;
       }
 
       // Other errors are logged and stored in the Dapp's state. This is used to
       // show them to the user, and for debugging.
       console.error(error);
-      setTransactionError((error as any).toString());
+      setTransactionError(error);
     } finally {
       // If we leave the try/catch, we aren't sending a tx anymore, so we clear
       // this part of the state.
@@ -128,7 +132,7 @@ function App() {
       <ConnectWallet
         connectWallet={async () => {
           try {
-            const selAddress = await _connectWallet();
+            const selAddress = await Eth.connectWallet();
             setSelectedAddress(selAddress);
             // We first initialize ethers by creating a provider using window.ethereum
             const _provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -140,6 +144,8 @@ function App() {
               ElectionsArtifact.abi,
               _provider.getSigner(0)
             ));
+
+
           } catch (e) {
             setError((e as Error).toString());
           }
@@ -149,18 +155,35 @@ function App() {
       />
     );
   } else {
-    contract?.owner().then(setOwner);
-    contract?.votingParameters().then(setVotingParameters);
-    contract?.getVotingOptions().then(setVotingOptions);
-    contract?.voters(selectedAddress).then(setVoter);
-    contract?.registeredVoters(0, 100).then(setRegisteredVoters); // TODO: pagination
+    if (contract) {
+      if (!owner) {
+        contract.owner().then((owner: string) => setOwner(owner.toLowerCase()));
+      }
+      if (!votingParameters) {
+        contract.votingParameters().then(setVotingParameters);
+      }
+      if (!votingOptions) {
+        contract.getVotingOptions().then(setVotingOptions);
+      }
+      if (!voter) {
+        contract.voters(selectedAddress).then(setVoter);
+      }
+      if (!registeredVoters) {
+        contract.getRegisteredVoters(0, 100).then(setRegisteredVoters); // TODO: pagination
+      }
+    }
   }
 
   return (
     <div className="App">
       <Grid container>
         <Grid item xs={4}>
-          {registeredVoters?.map()}
+          {registeredVoters?.map((address: string) => (
+            <>
+              {address}
+              <br />
+            </>
+          ))}
         </Grid>
         <Grid item xs={4}>
           <div className="row">
@@ -168,9 +191,11 @@ function App() {
               <>
                 Voting Process Duration:
                 <br />
-                {new Date(votingParameters.start.mul(1000).toNumber()).toTimeString()}
+                {new Date(votingParameters.start.mul(1000).toNumber()).toISOString()}
+                {`(${votingParameters.start})`}
                 {' - '}
-                {new Date(votingParameters.end.mul(1000).toNumber()).toTimeString()}
+                {new Date(votingParameters.end.mul(1000).toNumber()).toISOString()}
+                {`(${votingParameters.end})`}
               </>
             }
           </div>
@@ -185,7 +210,7 @@ function App() {
             </Typography>
           }
           <div className="row">
-            {votingOptions?.map((option: any) => (
+            {votingOptions?.map((option: any, idx: number) => (
               <>
                 <div>
                   {option.name}: {option.votes.toString()}
@@ -194,22 +219,47 @@ function App() {
                   {voter?.voted === false && voter?.registered && (
                     <Button
                       variant="contained"
-                      onClick={() => vote(0)}
-                    />
+                      onClick={() => sendTx(() => contract?.vote(idx), () => {
+                        contract?.getVotingOptions().then(setVotingOptions);
+                        contract?.voters(selectedAddress).then(setVoter);
+                      })}
+                    >Vote</Button>
                   )}
                 </div>
               </>
             ))}
           </div>
         </Grid>
-        {owner === selectedAddress &&
+        {owner && selectedAddress && owner === selectedAddress &&
           <Grid item xs={4}>
-            <Box>
+            <Box m={1}>
               <TextField
                 label="Whitelist adddress"
-                // ref={whitelistAddressRef}
+                inputRef={whitelistAddressRef}
               />
-              {/* <Button onClick={()=>} */}
+              <Button
+                variant="contained"
+                onClick={() => sendTx(() => contract?.registerVoters([whitelistAddressRef.current.value]), () => {
+                  contract?.voters(selectedAddress).then(setVoter);
+                  contract?.getRegisteredVoters(0, 100).then(setRegisteredVoters); /* TODO: pagination */
+                })}
+              >Whitelist</Button>
+            </Box>
+            <Box m={1}>
+              Start: 
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DateTimePicker onChange={setStartTime} />
+              </LocalizationProvider>
+              <br />
+              End: 
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DateTimePicker onChange={setEndTime} />
+              </LocalizationProvider>
+              <br />
+              <Button
+                variant="contained"
+                onClick={() => sendTx(() => contract?.setVotingPeriod(startTime?.unix(), endTime?.unix()), () => contract?.votingParameters().then(setVotingParameters))}
+              >Change Times</Button>
             </Box>
           </Grid>
         }
@@ -231,13 +281,13 @@ function App() {
             */}
           {transactionError && (
             <TransactionErrorMessage
-              message={_getRpcErrorMessage(transactionError)}
+              message={getRpcErrorMessage(transactionError)}
               dismiss={() => setTransactionError(null)}
             />
           )}
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 

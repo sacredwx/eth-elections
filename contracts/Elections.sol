@@ -1,10 +1,13 @@
 //SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.12;
+pragma solidity ^0.8.17;
 
 import "./VotingParameters.sol";
 import "./VoteOption.sol";
 import "./Voter.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+
+// TODO: Events!
+// TODO: Docs!
 
 contract Elections is Ownable {
     mapping(address => Voter) public voters;
@@ -97,11 +100,12 @@ contract Elections is Ownable {
 
     /// Returns the registered voters
     /// @dev Pagination is used to prevent failure on large address sets
-    function getRegisteredVoters(uint start, uint end) public view returns(address[] memory)
+    function getRegisteredVoters(uint start, uint limit) public view returns(address[] memory)
     {
-        address[] memory addresses = new address[](end-start);
+        uint size = (limit > registeredVoters.length - start) ? registeredVoters.length - start : limit;
+        address[] memory addresses = new address[](size);
         uint j=0;
-        for (uint i = start; i < end; i++) {
+        for (uint i = start; i < start + size && i < registeredVoters.length; i++) {
             addresses[j++] = registeredVoters[i];
         }
         return addresses;
