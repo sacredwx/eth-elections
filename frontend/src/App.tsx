@@ -17,7 +17,10 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import Eth from './lib/Eth';
 import { DateTimePicker } from '@mui/x-date-pickers';
-import dayjs, { Dayjs } from 'dayjs';
+import { Dayjs } from 'dayjs';
+import REST from './lib/REST';
+
+let rest: REST;
 
 // This is an error code that indicates that the user canceled a transaction
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
@@ -56,7 +59,7 @@ function App() {
   const whitelistAddressRef = useRef<any>();
 
   // This method is for the user to vote.
-  const sendTx = async (txAction: () => Promise<any>, postTxHook: () => void) => {
+  const sendTx = async (txAction: () => Promise<any>, postTxHook?: () => void) => {
     if (!contract) {
       return;
     }
@@ -95,7 +98,9 @@ function App() {
       }
 
       // Update related data on page
-      setTimeout(postTxHook, 3000);
+      if (postTxHook) {
+        setTimeout(postTxHook, 3000);
+      }
     } catch (error: any) {
       // We check the error code to see if this error was produced because the
       // user rejected a tx. If that's the case, we do nothing.
@@ -139,13 +144,14 @@ function App() {
 
             // Then, we initialize the contract using that provider and the token's
             // artifact. You can do this same thing with your contracts.
-            setContract(new ethers.Contract(
+            const _contract = new ethers.Contract(
               contractAddress.Elections,
               ElectionsArtifact.abi,
               _provider.getSigner(0)
-            ));
+            );
+            setContract(_contract);
 
-
+            rest = new REST(selAddress, contractAddress.Elections, _contract);
           } catch (e) {
             setError((e as Error).toString());
           }
@@ -213,17 +219,27 @@ function App() {
             {votingOptions?.map((option: any, idx: number) => (
               <>
                 <div>
-                  {option.name}: {option.votes.toString()}
+                  {option.name} #{idx}: {option.votes.toString()}
                   &nbsp;
                   votes
                   {voter?.voted === false && voter?.registered && (
-                    <Button
-                      variant="contained"
-                      onClick={() => sendTx(() => contract?.vote(idx), () => {
-                        contract?.getVotingOptions().then(setVotingOptions);
-                        contract?.voters(selectedAddress).then(setVoter);
-                      })}
-                    >Vote</Button>
+                    <>
+                      <Button
+                        variant="contained"
+                        onClick={() => sendTx(() => contract?.vote(idx), () => {
+                          contract?.getVotingOptions().then(setVotingOptions);
+                          contract?.voters(selectedAddress).then(setVoter);
+                        })}
+                      >Vote</Button>
+                      &nbsp;
+                      <Button
+                        variant="contained"
+                        onClick={() => sendTx(() => rest?.vote(idx), () => {
+                          contract?.getVotingOptions().then(setVotingOptions);
+                          contract?.voters(selectedAddress).then(setVoter);
+                        })}
+                      >Vote w/o Gas</Button>
+                    </>
                   )}
                 </div>
               </>
@@ -246,12 +262,12 @@ function App() {
               >Whitelist</Button>
             </Box>
             <Box m={1}>
-              Start: 
+              Start:
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker onChange={setStartTime} />
               </LocalizationProvider>
               <br />
-              End: 
+              End:
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker onChange={setEndTime} />
               </LocalizationProvider>

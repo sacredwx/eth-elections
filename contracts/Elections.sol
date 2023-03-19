@@ -9,6 +9,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 // TODO: Docs!
 
 contract Elections is Ownable {
+    string public constant EIP712Domain = "ETH-Elections";
+    string public constant EIP712DomainVersion = "1.0.0";
+
     mapping(address => Voter) public voters;
     address[] public registeredVoters;
     VoteOption[] public votingOptions;
@@ -39,6 +42,11 @@ contract Elections is Ownable {
         _;
     }
 
+    modifier eip712Deadline(uint256 deadline) {
+        require(block.timestamp < deadline, "Signed transaction expired");
+        _;
+    }
+
     /**
      * Contract initialization
      */
@@ -60,20 +68,34 @@ contract Elections is Ownable {
     /**
      * External functions
      */
+    
+    function eip712Vote(
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        address sender,
+        uint deadline,
+        uint voteOption
+    )
+    eip712Deadline(deadline)
+    external
+    {
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                keccak256("vote(address sender,uint deadline,uint voteOption)"),
+                sender,
+                deadline,
+                voteOption
+            )
+        );
 
-    function vote(uint voteOption) external duringVoting {
-        Voter storage voter = voters[msg.sender];
-        require(voter.registered, "Has no right to vote");
-        require(!voter.voted, "Already voted.");
-        voter.voted = true;
-        voter.vote = voteOption;
+        _validate(v, r, s, sender, hashStruct);
 
-        // If `voteOption` is out of the range of the array,
-        // this will throw automatically and revert all
-        // changes.
-        votingOptions[voteOption].votes++;
+        _vote(sender, voteOption);
+    }
 
-        emit Vote(msg.sender, voteOption);
+    function vote(uint voteOption) external {
+        _vote(msg.sender, voteOption);
     }
 
     /**
@@ -145,5 +167,55 @@ contract Elections is Ownable {
         votingParameters.end = votingEnd;
 
         emit VotingPeriodChange(votingStart, votingEnd);
+    }
+
+    /**
+     * Internal functions
+     */
+
+    function _validate(
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        address sender,
+        bytes32 hashStruct
+    ) internal view {
+        bytes32 hash = keccak256(abi.encodePacked("\x19\x01", _computeEIP712DomainHash(), hashStruct));
+        address signer = ecrecover(hash, v, r, s);
+        require(signer == sender, "Invalid signature");
+        require(signer != address(0), "ECDSA: invalid signature");
+    }
+
+    function _computeEIP712DomainHash() internal view returns (bytes32 eip712DomainHash) {
+        uint chainId;
+        assembly {
+            chainId := chainid()
+        }
+        eip712DomainHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes(EIP712Domain)),
+                keccak256(bytes(EIP712DomainVersion)),
+                chainId,
+                address(this)
+            )
+        );  
+    }
+
+    function _vote(address sender, uint voteOption) internal duringVoting {
+        Voter storage voter = voters[sender];
+        require(voter.registered, "Has no right to vote");
+        require(!voter.voted, "Already voted.");
+        voter.voted = true;
+        voter.vote = voteOption;
+
+        // If `voteOption` is out of the range of the array,
+        // this will throw automatically and revert all
+        // changes.
+        votingOptions[voteOption].votes++;
+
+        emit Vote(sender, voteOption);
     }
 }
