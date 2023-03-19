@@ -6,7 +6,6 @@ import "./VoteOption.sol";
 import "./Voter.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// TODO: Events!
 // TODO: Docs!
 
 contract Elections is Ownable {
@@ -14,6 +13,11 @@ contract Elections is Ownable {
     address[] public registeredVoters;
     VoteOption[] public votingOptions;
     VotingParameters public votingParameters;
+
+    event NewVoting(string[] options);
+    event Vote(address indexed voter, uint indexed option);
+    event RegisterVoter(address indexed voter);
+    event VotingPeriodChange(uint start, uint end);
 
     /**
      * Modifiers
@@ -48,6 +52,9 @@ contract Elections is Ownable {
         require(votingStart < votingEnd, "Invalid dates passed");
         votingParameters.start = votingStart;
         votingParameters.end = votingEnd;
+
+        emit NewVoting(options);
+        emit VotingPeriodChange(votingStart, votingEnd);
     }
 
     /**
@@ -65,6 +72,8 @@ contract Elections is Ownable {
         // this will throw automatically and revert all
         // changes.
         votingOptions[voteOption].votes++;
+
+        emit Vote(msg.sender, voteOption);
     }
 
     /**
@@ -124,6 +133,8 @@ contract Elections is Ownable {
             });
             voters[addresses[i]] = voter;
             registeredVoters.push(payable(addresses[i]));
+
+            emit RegisterVoter(addresses[i]);
         }
     }
 
@@ -132,5 +143,7 @@ contract Elections is Ownable {
         require(votingStart < votingEnd, "Invalid dates passed");
         votingParameters.start = votingStart;
         votingParameters.end = votingEnd;
+
+        emit VotingPeriodChange(votingStart, votingEnd);
     }
 }
