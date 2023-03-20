@@ -1,11 +1,16 @@
+import { Contract } from 'ethers';
+import DAL from './DAL';
+
 declare global {
   interface Window {
     ethereum: import('ethers').providers.ExternalProvider;
   }
 }
 
-class Eth {
-  public async connectWallet(): Promise<string> {
+class Eth implements DAL {
+  constructor(private contract: Contract) { }
+
+  public static async connectWallet(): Promise<string> {
     // This method is run when the user clicks the Connect. It connects the
     // dapp to the user's wallet, and initializes it.
 
@@ -17,7 +22,38 @@ class Eth {
 
     return selectedAddress;
   }
+
+  public owner (): Promise<any> {
+    return this.contract.owner();
+  };
+
+  public votingParameters(): Promise<any> {
+    return this.contract.votingParameters();
+  };
+
+  public getVotingOptions(): Promise<any> {
+    return this.contract.getVotingOptions();
+  };
+
+  public voters(address: string): Promise<any> {
+    return this.contract.voters(address);
+  };
+
+  public getRegisteredVoters(start: number, limit: number): Promise<any> {
+    return this.contract.getRegisteredVoters(start, limit);
+  };
+
+  public vote(voteOption: number): Promise<any> {
+    return this.contract.vote(voteOption);
+  };
+
+  public registerVoter(address: string): Promise<any> {
+    return this.contract.registerVoters([address]);
+  };
+
+  public setVotingPeriod(votingStart: number, votingEnd: number): Promise<any> {
+    return this.contract.setVotingPeriod(votingStart, votingEnd);
+  };
 }
 
-const eth = new Eth();
-export default eth;
+export default Eth;

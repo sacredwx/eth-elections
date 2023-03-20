@@ -12,14 +12,16 @@ import { NoWalletDetected } from './components/NoWalletDetected';
 import { ConnectWallet } from './components/ConnectWallet';
 import { TransactionErrorMessage } from './components/TransactionErrorMessage';
 import { WaitingForTransactionMessage } from './components/WaitingForTransactionMessage';
-import { Box, Button, Grid, LinearProgress, TextField, Typography } from '@mui/material';
+import { Box, Button, Grid, LinearProgress, Switch, TextField, Typography } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import Eth from './lib/Eth';
 import { DateTimePicker } from '@mui/x-date-pickers';
 import { Dayjs } from 'dayjs';
 import REST from './lib/REST';
+import DAL from './lib/DAL';
 
+let eth: Eth;
 let rest: REST;
 
 // This is an error code that indicates that the user canceled a transaction
@@ -43,7 +45,7 @@ const getRpcErrorMessage = (error: any) => {
 }
 
 function App() {
-  const [contract, setContract] = useState<ethers.Contract | null>(null);
+  const [dal, setDAL] = useState<DAL | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
   const [transactionError, setTransactionError] = useState<any | null>(null);
   const [txBeingSent, setTxBeingSent] = useState<string | null>(null);
@@ -62,7 +64,7 @@ function App() {
 
   // This method is for the user to vote.
   const sendTx = async (txAction: () => Promise<any>, postTxHook?: () => void) => {
-    if (!contract) {
+    if (!dal) {
       return;
     }
 
@@ -130,6 +132,15 @@ function App() {
     }
   }
 
+  const refresh = (dal: DAL) => {
+    console.log(dal);
+    dal.owner().then((owner: string) => setOwner(owner.toLowerCase()));
+    dal.votingParameters().then(setVotingParameters);
+    dal.getVotingOptions().then(setVotingOptions);
+    dal.voters(selectedAddress!).then(setVoter);
+    dal.getRegisteredVoters(0, 100).then(setRegisteredVoters); // TODO: pagination
+  };
+
   // Ethereum wallets inject the window.ethereum object. If it hasn't been
   // injected, we instruct the user to install MetaMask.
   if (window.ethereum === undefined) {
@@ -160,9 +171,11 @@ function App() {
               ElectionsArtifact.abi,
               _provider.getSigner(0)
             );
-            setContract(_contract);
 
+            eth = new Eth(_contract);
             rest = new REST(selAddress, contractAddress.Elections);
+
+            setDAL(eth);
           } catch (e) {
             setError((e as Error).toString());
           }
@@ -172,167 +185,143 @@ function App() {
       />
     );
   } else {
-    if (contract) {
-      if (!owner) {
-        contract.owner().then((owner: string) => setOwner(owner.toLowerCase()));
-      }
-      if (!votingParameters) {
-        contract.votingParameters().then(setVotingParameters);
-      }
-      if (!votingOptions) {
-        contract.getVotingOptions().then(setVotingOptions);
-      }
-      if (!voter) {
-        contract.voters(selectedAddress).then(setVoter);
-      }
-      if (!registeredVoters) {
-        contract.getRegisteredVoters(0, 100).then(setRegisteredVoters); // TODO: pagination
-      }
+    if (dal) {
+      refresh(dal);
     }
   }
 
   return (
-    <div className="App">
-      <Grid container>
-        <Grid item xs={4}>
-          {registeredVoters?.map((address: string) => (
-            <>
-              {address}
-              <br />
-            </>
-          ))}
-        </Grid>
-        <Grid item xs={4}>
-          <div className="row">
-            {votingParameters &&
-              <>
-                Voting Process Duration:
-                <br />
-                {new Date(votingParameters.start.mul(1000).toNumber()).toISOString()}
-                {`(${votingParameters.start})`}
-                {' - '}
-                {new Date(votingParameters.end.mul(1000).toNumber()).toISOString()}
-                {`(${votingParameters.end})`}
-              </>
-            }
-          </div>
-          {voter?.registered === false &&
-            <Typography sx={{ color: 'red' }}>
-              You have no right to vote
-            </Typography>
-          }
-          {voter?.voted && votingOptions &&
-            <Typography sx={{ color: 'green' }}>
-              Your vote is: {votingOptions[voter.vote.toNumber()].name}
-            </Typography>
-          }
-          <div className="row">
-            {votingOptions?.map((option: any, idx: number) => (
-              <>
-                <div>
-                  {option.name} #{idx}: {option.votes.toString()}
-                  &nbsp;
-                  votes
-                  {voter?.voted === false && voter?.registered && (
-                    <>
-                      <Button
-                        variant="contained"
-                        onClick={() => sendTx(() => contract?.vote(idx), () => {
-                          contract?.getVotingOptions().then(setVotingOptions);
-                          contract?.voters(selectedAddress).then(setVoter);
-                        })}
-                      >Vote</Button>
+    <>
+      {dal && (
+        <div className="App">
+          <Grid container>
+            <Grid item xs={4}>
+              {registeredVoters?.map((address: string) => (
+                <>
+                  {address}
+                  <br />
+                </>
+              ))}
+            </Grid>
+            <Grid item xs={4}>
+              <div className="row">
+                {votingParameters &&
+                  <>
+                    Voting Process Duration:
+                    <br />
+                    {new Date(votingParameters.start.mul(1000).toNumber()).toISOString()}
+                    {`(${votingParameters.start})`}
+                    {' - '}
+                    {new Date(votingParameters.end.mul(1000).toNumber()).toISOString()}
+                    {`(${votingParameters.end})`}
+                  </>
+                }
+              </div>
+              {voter?.registered === false &&
+                <Typography sx={{ color: 'red' }}>
+                  You have no right to vote
+                </Typography>
+              }
+              {voter?.voted && votingOptions &&
+                <Typography sx={{ color: 'green' }}>
+                  Your vote is: {votingOptions[voter.vote.toNumber()].name}
+                </Typography>
+              }
+              <div className="row">
+                {votingOptions?.map((option: any, idx: number) => (
+                  <>
+                    <div>
+                      {option.name} #{idx}: {option.votes.toString()}
                       &nbsp;
-                      <Button
-                        variant="contained"
-                        onClick={() => sendTx(() => rest?.vote(idx), () => {
-                          contract?.getVotingOptions().then(setVotingOptions);
-                          contract?.voters(selectedAddress).then(setVoter);
-                        })}
-                      >Vote w/o Gas</Button>
-                    </>
-                  )}
-                </div>
-              </>
-            ))}
-          </div>
-        </Grid>
-        {owner && selectedAddress && owner === selectedAddress &&
-          <Grid item xs={4}>
-            <Box m={1}>
-              <TextField
-                label="Whitelist adddress"
-                inputRef={whitelistAddressRef}
-              />
-              <Button
-                variant="contained"
-                onClick={() => sendTx(() => contract?.registerVoters([whitelistAddressRef.current.value]), () => {
-                  contract?.voters(selectedAddress).then(setVoter);
-                  contract?.getRegisteredVoters(0, 100).then(setRegisteredVoters); /* TODO: pagination */
-                })}
-              >Whitelist</Button>
-              &nbsp;
-              <Button
-                variant="contained"
-                onClick={() => sendTx(() => rest?.registerVoter(whitelistAddressRef.current.value), () => {
-                  contract?.voters(selectedAddress).then(setVoter);
-                  contract?.getRegisteredVoters(0, 100).then(setRegisteredVoters); /* TODO: pagination */
-                })}
-              >Whitelist w/o Gas</Button>
-            </Box>
-            <Box m={1}>
-              Start:
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DateTimePicker onChange={setStartTime} />
-              </LocalizationProvider>
-              <br />
-              End:
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DateTimePicker onChange={setEndTime} />
-              </LocalizationProvider>
-              <br />
-              <Button
-                variant="contained"
-                onClick={() => sendTx(() => contract?.setVotingPeriod(startTime?.unix(), endTime?.unix()), () => contract?.votingParameters().then(setVotingParameters))}
-              >Change Times</Button>
-              <br />
-              <Button
-                variant="contained"
-                onClick={() => sendTx(() => rest?.setVotingPeriod(startTime!.unix(), endTime!.unix()), () => contract?.votingParameters().then(setVotingParameters))}
-              >Change Times w/o Gas</Button>
-            </Box>
+                      votes
+                      {voter?.voted === false && voter?.registered && (
+                        <>
+                          <Button
+                            variant="contained"
+                            onClick={() => sendTx(() => dal.vote(idx), () => {
+                              dal.getVotingOptions().then(setVotingOptions);
+                              dal.voters(selectedAddress).then(setVoter);
+                            })}
+                          >Vote</Button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ))}
+              </div>
+            </Grid>
+            {owner && selectedAddress && owner === selectedAddress &&
+              <Grid item xs={4}>
+                <Box m={1}>
+                  REST API <Switch defaultChecked onChange={(e) => {
+                    const _dal = e.target.checked ? eth : rest;
+                    setDAL(_dal);
+                    refresh(_dal);
+                  }} /> Ethereum Txs
+                </Box>
+                <Box m={1}>
+                  <TextField
+                    label="Whitelist adddress"
+                    inputRef={whitelistAddressRef}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={() => sendTx(() => dal.registerVoter(whitelistAddressRef.current.value), () => {
+                      dal.voters(selectedAddress).then(setVoter);
+                      dal.getRegisteredVoters(0, 100).then(setRegisteredVoters); /* TODO: pagination */
+                    })}
+                  >Whitelist</Button>
+                </Box>
+                <Box m={1}>
+                  Start:
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DateTimePicker onChange={setStartTime} />
+                  </LocalizationProvider>
+                  <br />
+                  End:
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DateTimePicker onChange={setEndTime} />
+                  </LocalizationProvider>
+                  <br />
+                  <Button
+                    variant="contained"
+                    onClick={() => sendTx(() => dal.setVotingPeriod(startTime!.unix(), endTime!.unix()), () => dal.votingParameters().then(setVotingParameters))}
+                  >Change Times</Button>
+                </Box>
+              </Grid>
+            }
           </Grid>
-        }
-      </Grid>
-      <div className="row">
-        <div className="col-12">
-          {progress &&
-            <Box sx={{ margin: '0 auto', width: '60%' }}>
-              <LinearProgress />
-            </Box>
-          }
-          {/* 
+          <div className="row">
+            <div className="col-12">
+              {progress &&
+                <Box sx={{ margin: '0 auto', width: '60%' }}>
+                  <LinearProgress />
+                </Box>
+              }
+              {/* 
               Sending a transaction isn't an immediate action. You have to wait
               for it to be mined.
               If we are waiting for one, we show a message here.
             */}
-          {txBeingSent && (
-            <WaitingForTransactionMessage txHash={txBeingSent} />
-          )}
+              {txBeingSent && (
+                <WaitingForTransactionMessage txHash={txBeingSent} />
+              )}
 
-          {/* 
+              {/* 
               Sending a transaction can fail in multiple ways. 
               If that happened, we show a message here.
             */}
-          {transactionError && (
-            <TransactionErrorMessage
-              message={getRpcErrorMessage(transactionError)}
-              dismiss={() => setTransactionError(null)}
-            />
-          )}
-        </div>
-      </div>
-    </div >
+              {transactionError && (
+                <TransactionErrorMessage
+                  message={getRpcErrorMessage(transactionError)}
+                  dismiss={() => setTransactionError(null)}
+                />
+              )}
+            </div>
+          </div>
+        </div >
+      )}
+    </>
   );
 }
 

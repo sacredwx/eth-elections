@@ -1,13 +1,62 @@
 import { SignTypedDataVersion, recoverTypedSignature } from '@metamask/eth-sig-util';
 import { Buffer } from "buffer";
+import DAL from './DAL';
 window.Buffer = window.Buffer || Buffer;
 
-class REST {
+const fetchConfig = {
+  method: 'POST',
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  },
+};
+
+class REST implements DAL {
   public static readonly HOST: string = 'http://localhost';
   public static readonly DOMAIN_VERSION: string = '1.0.0';
   public static readonly TX_DEADLINE: number = 5;
 
   constructor(private signer: string, private verifyingContract: string) { }
+
+  public owner = async () => {
+    const resp = await fetch(`${REST.HOST}/owner`);
+    if (!resp.ok) {
+      throw (await resp.json()).error?.error?.error;
+    }
+    return resp.json();
+  }
+
+  public votingParameters = async () => {
+    const resp = await fetch(`${REST.HOST}/votingParameters`);
+    if (!resp.ok) {
+      throw (await resp.json()).error?.error?.error;
+    }
+    return resp.json();
+  }
+
+  public getVotingOptions = async () => {
+    const resp = await fetch(`${REST.HOST}/getVotingOptions`);
+    if (!resp.ok) {
+      throw (await resp.json()).error?.error?.error;
+    }
+    return resp.json();
+  }
+
+  public voters = async (address: string) => {
+    const resp = await fetch(`${REST.HOST}/voters/${address}`);
+    if (!resp.ok) {
+      throw (await resp.json()).error?.error?.error;
+    }
+    return resp.json();
+  }
+
+  public getRegisteredVoters = async (start: number, limit: number) => {
+    const resp = await fetch(`${REST.HOST}/getRegisteredVoters/${start}/${limit}`);
+    if (!resp.ok) {
+      throw (await resp.json()).error?.error?.error;
+    }
+    return resp.json();
+  }
 
   public vote(voteOption: number) {
     return this.signData("vote", { voteOption })
@@ -93,11 +142,7 @@ class REST {
     console.log(req);
 
     const resp = await fetch(`${REST.HOST}/${primaryType}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
+      ...fetchConfig,
       body: JSON.stringify(req),
     });
     if (!resp.ok) {
