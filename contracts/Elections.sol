@@ -145,28 +145,71 @@ contract Elections is Ownable {
     /**
      * Owner only
      */
+    
+    function eip712RegisterVoter(
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        address sender,
+        uint deadline,
+        address addr
+    )
+    eip712Deadline(deadline)
+    external
+    {
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                keccak256("registerVoter(address sender,uint deadline,address address)"),
+                sender,
+                deadline,
+                addr
+            )
+        );
 
-    function registerVoters(address[] memory addresses) external onlyOwner beforeVoting {
-        for (uint i = 0; i < addresses.length; i++) {
-            Voter memory voter = Voter({
-                registered: true,
-                voted: false,
-                vote: 0
-            });
-            voters[addresses[i]] = voter;
-            registeredVoters.push(payable(addresses[i]));
+        _validate(v, r, s, sender, hashStruct);
 
-            emit RegisterVoter(addresses[i]);
-        }
+        require (sender == owner(), "Unauthorized action!");
+
+        address[] memory addresses = new address[](1);
+        addresses[0] = addr;
+        _registerVoters(addresses);
     }
 
-    function setVotingPeriod(uint votingStart, uint votingEnd) public onlyOwner beforeVoting {
-        require(block.timestamp < votingStart, "Start date is in the past");
-        require(votingStart < votingEnd, "Invalid dates passed");
-        votingParameters.start = votingStart;
-        votingParameters.end = votingEnd;
+    function registerVoters(address[] memory addresses) onlyOwner external {
+        _registerVoters(addresses);
+    }
 
-        emit VotingPeriodChange(votingStart, votingEnd);
+    function eip712SetVotingPeriod(
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        address sender,
+        uint deadline,
+        uint votingStart,
+        uint votingEnd
+    )
+    eip712Deadline(deadline)
+    external
+    {
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                keccak256("setVotingPeriod(address sender,uint deadline,uint votingStart,uint votingEnd)"),
+                sender,
+                deadline,
+                votingStart,
+                votingEnd
+            )
+        );
+
+        _validate(v, r, s, sender, hashStruct);
+
+        require (sender == owner(), "Unauthorized action!");
+
+        _setVotingPeriod(votingStart, votingEnd);
+    }
+
+    function setVotingPeriod(uint votingStart, uint votingEnd) onlyOwner external {
+        _setVotingPeriod(votingStart, votingEnd);
     }
 
     /**
@@ -217,5 +260,28 @@ contract Elections is Ownable {
         votingOptions[voteOption].votes++;
 
         emit Vote(sender, voteOption);
+    }
+
+    function _registerVoters(address[] memory addresses) internal beforeVoting {
+        for (uint i = 0; i < addresses.length; i++) {
+            Voter memory voter = Voter({
+                registered: true,
+                voted: false,
+                vote: 0
+            });
+            voters[addresses[i]] = voter;
+            registeredVoters.push(payable(addresses[i]));
+
+            emit RegisterVoter(addresses[i]);
+        }
+    }
+
+    function _setVotingPeriod(uint votingStart, uint votingEnd) internal beforeVoting {
+        require(block.timestamp < votingStart, "Start date is in the past");
+        require(votingStart < votingEnd, "Invalid dates passed");
+        votingParameters.start = votingStart;
+        votingParameters.end = votingEnd;
+
+        emit VotingPeriodChange(votingStart, votingEnd);
     }
 }

@@ -1,19 +1,27 @@
-import { Contract } from "ethers";
 import { SignTypedDataVersion, recoverTypedSignature } from '@metamask/eth-sig-util';
 import { Buffer } from "buffer";
 window.Buffer = window.Buffer || Buffer;
 
 class REST {
+  public static readonly HOST: string = 'http://localhost';
   public static readonly DOMAIN_VERSION: string = '1.0.0';
   public static readonly TX_DEADLINE: number = 5;
 
-  constructor(private signer: string, private verifyingContract: string, private contract: Contract) { }
+  constructor(private signer: string, private verifyingContract: string) { }
 
   public vote(voteOption: number) {
-    return this.signData("eip712Vote", "vote", { voteOption })
+    return this.signData("vote", { voteOption })
   }
 
-  private async signData(method: string, primaryType: string, params: any) {
+  public registerVoter(address: string) {
+    return this.signData("registerVoter", { address })
+  }
+
+  public setVotingPeriod(votingStart: number, votingEnd: number) {
+    return this.signData("setVotingPeriod", { votingStart, votingEnd })
+  }
+
+  private async signData(primaryType: string, params: any): Promise<any> {
     const deadline = Math.floor(Date.now() / 1000) + REST.TX_DEADLINE;
     console.log("Deadline: ", deadline, "sec");
 
@@ -33,7 +41,18 @@ class REST {
           { name: "sender", type: "address" },
           { name: "deadline", type: "uint" },
           { name: "voteOption", type: "uint" },
-        ]
+        ],
+        registerVoter: [
+          { name: "sender", type: "address" },
+          { name: "deadline", type: "uint" },
+          { name: "address", type: "address" },
+        ],
+        setVotingPeriod: [
+          { name: "sender", type: "address" },
+          { name: "deadline", type: "uint" },
+          { name: "votingStart", type: "uint" },
+          { name: "votingEnd", type: "uint" },
+        ],
       },
       primaryType,
       domain: { name: "ETH-Elections", version: REST.DOMAIN_VERSION, chainId: netId, verifyingContract: this.verifyingContract },
@@ -63,11 +82,28 @@ class REST {
     const r = "0x" + signature.substring(0, 64);
     const s = "0x" + signature.substring(64, 128);
     const v = parseInt(signature.substring(128, 130), 16);
-    console.log("r:", r);
-    console.log("s:", s);
-    console.log("v:", v);
+    const req = {
+      v,
+      r,
+      s,
+      signer: this.signer,
+      deadline,
+      ...params,
+    };
+    console.log(req);
 
-    this.contract[method](v, r, s, this.signer, deadline, Object.values(params));
+    const resp = await fetch(`${REST.HOST}/${primaryType}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(req),
+    });
+    if (!resp.ok) {
+      throw (await resp.json()).error?.error?.error;
+    }
+    return resp.json();
   }
 }
 

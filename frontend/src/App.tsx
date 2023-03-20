@@ -12,7 +12,7 @@ import { NoWalletDetected } from './components/NoWalletDetected';
 import { ConnectWallet } from './components/ConnectWallet';
 import { TransactionErrorMessage } from './components/TransactionErrorMessage';
 import { WaitingForTransactionMessage } from './components/WaitingForTransactionMessage';
-import { Box, Button, Grid, TextField, Typography } from '@mui/material';
+import { Box, Button, Grid, LinearProgress, TextField, Typography } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import Eth from './lib/Eth';
@@ -24,6 +24,7 @@ let rest: REST;
 
 // This is an error code that indicates that the user canceled a transaction
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
+const REFRESH_TIME = 30000;
 
 declare global {
   interface Window {
@@ -48,6 +49,7 @@ function App() {
   const [txBeingSent, setTxBeingSent] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<Dayjs | null>(null);
   const [endTime, setEndTime] = useState<Dayjs | null>(null);
+  const [progress, setProgress] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const [votingParameters, setVotingParameters] = useState<any>(null);
@@ -76,6 +78,7 @@ function App() {
     //
 
     try {
+      setProgress(true);
       // If a transaction fails, we save that error in the component's state.
       // We only save one such error, so before sending a second transaction, we
       // clear it.
@@ -88,18 +91,25 @@ function App() {
 
       // We use .wait() to wait for the transaction to be mined. This method
       // returns the transaction's receipt.
-      const receipt = await tx.wait();
+      if (tx.wait) {
+        const receipt = await tx.wait();
 
-      // The receipt, contains a status flag, which is 0 to indicate an error.
-      if (receipt.status === 0) {
-        // We can't know the exact error that made the transaction fail when it
-        // was mined, so we throw this generic one.
-        throw new Error("Transaction failed");
+        // The receipt, contains a status flag, which is 0 to indicate an error.
+        if (receipt.status === 0) {
+          // We can't know the exact error that made the transaction fail when it
+          // was mined, so we throw this generic one.
+          throw new Error("Transaction failed");
+        }
       }
 
       // Update related data on page
       if (postTxHook) {
-        setTimeout(postTxHook, 3000);
+        setTimeout(() => {
+          postTxHook();
+          setProgress(false);
+        }, REFRESH_TIME);
+      } else {
+        setProgress(false);
       }
     } catch (error: any) {
       // We check the error code to see if this error was produced because the
@@ -112,6 +122,7 @@ function App() {
       // show them to the user, and for debugging.
       console.error(error);
       setTransactionError(error);
+      setProgress(false);
     } finally {
       // If we leave the try/catch, we aren't sending a tx anymore, so we clear
       // this part of the state.
@@ -151,7 +162,7 @@ function App() {
             );
             setContract(_contract);
 
-            rest = new REST(selAddress, contractAddress.Elections, _contract);
+            rest = new REST(selAddress, contractAddress.Elections);
           } catch (e) {
             setError((e as Error).toString());
           }
@@ -260,6 +271,14 @@ function App() {
                   contract?.getRegisteredVoters(0, 100).then(setRegisteredVoters); /* TODO: pagination */
                 })}
               >Whitelist</Button>
+              &nbsp;
+              <Button
+                variant="contained"
+                onClick={() => sendTx(() => rest?.registerVoter(whitelistAddressRef.current.value), () => {
+                  contract?.voters(selectedAddress).then(setVoter);
+                  contract?.getRegisteredVoters(0, 100).then(setRegisteredVoters); /* TODO: pagination */
+                })}
+              >Whitelist w/o Gas</Button>
             </Box>
             <Box m={1}>
               Start:
@@ -276,12 +295,22 @@ function App() {
                 variant="contained"
                 onClick={() => sendTx(() => contract?.setVotingPeriod(startTime?.unix(), endTime?.unix()), () => contract?.votingParameters().then(setVotingParameters))}
               >Change Times</Button>
+              <br />
+              <Button
+                variant="contained"
+                onClick={() => sendTx(() => rest?.setVotingPeriod(startTime!.unix(), endTime!.unix()), () => contract?.votingParameters().then(setVotingParameters))}
+              >Change Times w/o Gas</Button>
             </Box>
           </Grid>
         }
       </Grid>
       <div className="row">
         <div className="col-12">
+          {progress &&
+            <Box sx={{ margin: '0 auto', width: '60%' }}>
+              <LinearProgress />
+            </Box>
+          }
           {/* 
               Sending a transaction isn't an immediate action. You have to wait
               for it to be mined.

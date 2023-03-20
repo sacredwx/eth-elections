@@ -23,7 +23,7 @@ npm install
 Once installed, let's run Hardhat's testing network:
 
 ```sh
-npx hardhat node
+npx hardhat node --hostname 127.0.0.1
 ```
 
 Then, on a new terminal, go to the repository's root folder and run this to
@@ -88,3 +88,12 @@ If you need help with this project, or with Hardhat in general, please read [thi
 For the latest news about Hardhat, [follow us on Twitter](https://twitter.com/HardhatHQ), and don't forget to star [our GitHub repository](https://github.com/NomicFoundation/hardhat)!
 
 **Happy _building_!**
+
+**.env**
+
+at backend/.env
+
+PORT=80
+RPC_ENDPOINT=http://127.0.0.1:8545
+# RPC_ENDPOINT=https://rpc.ankr.com/eth_goerli
+PRIVATE_KEY={*GOERLI_ACCOUNT*}

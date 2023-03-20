@@ -1,7 +1,8 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
-  "private": true,
+  "name": "eth-elections-frontend",
+  "version": "1.0.0",
+  "license": "MIT",
+  "author": "sacredwx",
   "dependencies": {
     "@emotion/react": "^11.10.6",
     "@emotion/styled": "^11.10.6",

@@ -3,7 +3,7 @@
 
 const path = require("path");
 
-const VOTING_DELAY = 300; // in Seconds
+const VOTING_DELAY = 3000; // in Seconds
 const VOTING_DURATION = 1000; // in Seconds
 
 async function main() {
@@ -53,12 +53,15 @@ async function main() {
   console.log("Elections address:", elections.address);
 
   // We also save the contract's artifacts and address in the frontend directory
-  saveFrontendFiles(elections);
+  saveArtifacts(elections);
 }
 
-function saveFrontendFiles(elections) {
+function saveArtifacts(elections) {
   const fs = require("fs");
-  const contractsDir = path.join(__dirname, "..", "frontend", "src", "contracts");
+
+  // Frontend
+
+  let contractsDir = path.join(__dirname, "..", "frontend", "src", "contracts");
 
   if (!fs.existsSync(contractsDir)) {
     fs.mkdirSync(contractsDir);
@@ -70,6 +73,24 @@ function saveFrontendFiles(elections) {
   );
 
   const ElectionsArtifact = artifacts.readArtifactSync("Elections");
+
+  fs.writeFileSync(
+    path.join(contractsDir, "Elections.json"),
+    JSON.stringify(ElectionsArtifact, null, 2)
+  );
+
+  // Backend
+
+  contractsDir = path.join(__dirname, "..", "backend", "contracts");
+
+  if (!fs.existsSync(contractsDir)) {
+    fs.mkdirSync(contractsDir);
+  }
+
+  fs.writeFileSync(
+    path.join(contractsDir, "contract-address.json"),
+    JSON.stringify({ Elections: elections.address }, undefined, 2)
+  );
 
   fs.writeFileSync(
     path.join(contractsDir, "Elections.json"),
