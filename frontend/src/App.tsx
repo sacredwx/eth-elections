@@ -26,7 +26,7 @@ let rest: REST;
 
 // This is an error code that indicates that the user canceled a transaction
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
-const REFRESH_TIME = 30000;
+const REFRESH_TIME = 8000;
 
 declare global {
   interface Window {
@@ -133,12 +133,13 @@ function App() {
   }
 
   const refresh = (dal: DAL) => {
-    console.log(dal);
-    dal.owner().then((owner: string) => setOwner(owner.toLowerCase()));
-    dal.votingParameters().then(setVotingParameters);
-    dal.getVotingOptions().then(setVotingOptions);
-    dal.voters(selectedAddress!).then(setVoter);
-    dal.getRegisteredVoters(0, 100).then(setRegisteredVoters); // TODO: pagination
+    if (dal) {
+      dal.owner().then((owner: string) => setOwner(owner.toLowerCase()));
+      dal.votingParameters().then(setVotingParameters);
+      dal.getVotingOptions().then(setVotingOptions);
+      dal.voters(selectedAddress!).then(setVoter);
+      dal.getRegisteredVoters(0, 100).then(setRegisteredVoters); // TODO: pagination
+    }
   };
 
   // Ethereum wallets inject the window.ethereum object. If it hasn't been
@@ -186,7 +187,21 @@ function App() {
     );
   } else {
     if (dal) {
-      refresh(dal);
+      if (!owner) {
+        dal.owner().then((owner: string) => setOwner(owner.toLowerCase()));
+      }
+      if (!votingParameters) {
+        dal.votingParameters().then(setVotingParameters);
+      }
+      if (!votingOptions) {
+        dal.getVotingOptions().then(setVotingOptions);
+      }
+      if (!voter) {
+        dal.voters(selectedAddress!).then(setVoter);
+      }
+      if (!registeredVoters) {
+        dal.getRegisteredVoters(0, 100).then(setRegisteredVoters); // TODO: pagination
+      }
     }
   }
 
@@ -209,10 +224,10 @@ function App() {
                   <>
                     Voting Process Duration:
                     <br />
-                    {new Date(votingParameters.start.mul(1000).toNumber()).toISOString()}
+                    {new Date(votingParameters.start * 1000).toISOString()}
                     {`(${votingParameters.start})`}
                     {' - '}
-                    {new Date(votingParameters.end.mul(1000).toNumber()).toISOString()}
+                    {new Date(votingParameters.end * 1000).toISOString()}
                     {`(${votingParameters.end})`}
                   </>
                 }
@@ -224,7 +239,7 @@ function App() {
               }
               {voter?.voted && votingOptions &&
                 <Typography sx={{ color: 'green' }}>
-                  Your vote is: {votingOptions[voter.vote.toNumber()].name}
+                  Your vote is: {votingOptions[voter.vote].name}
                 </Typography>
               }
               <div className="row">

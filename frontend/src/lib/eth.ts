@@ -27,16 +27,25 @@ class Eth implements DAL {
     return this.contract.owner();
   };
 
-  public votingParameters(): Promise<any> {
-    return this.contract.votingParameters();
+  public async votingParameters(): Promise<any> {
+    const resp = await this.contract.votingParameters();
+    return {
+      start: resp.start.toNumber(),
+      end: resp.end.toNumber(),
+    }
   };
 
   public getVotingOptions(): Promise<any> {
     return this.contract.getVotingOptions();
   };
 
-  public voters(address: string): Promise<any> {
-    return this.contract.voters(address);
+  public async voters(address: string): Promise<any> {
+    const resp = await this.contract.voters(address);
+    return {
+      registered: resp.registered,
+      voted: resp.voted,
+      vote: resp.vote.toNumber(),
+    };
   };
 
   public getRegisteredVoters(start: number, limit: number): Promise<any> {

@@ -3,7 +3,7 @@
 
 const path = require("path");
 
-const VOTING_DELAY = 3000; // in Seconds
+const VOTING_DELAY = 300; // in Seconds
 const VOTING_DURATION = 1000; // in Seconds
 
 async function main() {
