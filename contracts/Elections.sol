@@ -6,16 +6,18 @@ import "./VoteOption.sol";
 import "./Voter.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// TODO: Docs!
-
+/// @title Elections Contract
+/// @author sacredwx
+/// @notice Simple elections, voting once during the period - no changes
+/// @dev This contract is intended for usage either directly or via EIP712 relayed to the backend server
 contract Elections is Ownable {
     string public constant EIP712Domain = "ETH-Elections";
     string public constant EIP712DomainVersion = "1.0.0";
 
-    mapping(address => Voter) public voters;
-    address[] public registeredVoters;
-    VoteOption[] public votingOptions;
-    VotingParameters public votingParameters;
+    mapping(address => Voter) public voters;    // Voter addresses to voter object mapping
+    address[] public registeredVoters;          // A set of registered addresses
+    VoteOption[] public votingOptions;          // A set of voting options objects
+    VotingParameters public votingParameters;   // Voting parameters object
 
     event NewVoting(string[] options);
     event Vote(address indexed voter, uint indexed option);
@@ -26,6 +28,7 @@ contract Elections is Ownable {
      * Modifiers
      */
 
+    /// @dev Requires function's execution only before the settled voting start time
     modifier beforeVoting() {
         require(
             block.timestamp < votingParameters.start,
@@ -34,6 +37,8 @@ contract Elections is Ownable {
         _;
     }
 
+    /// @dev Requires function's execution just between the
+    /// voting start time and the voting end time
     modifier duringVoting() {
         require(
             block.timestamp >= votingParameters.start && block.timestamp < votingParameters.end,
@@ -42,6 +47,7 @@ contract Elections is Ownable {
         _;
     }
 
+    /// @dev Requires function's execution just before the specified deadline
     modifier eip712Deadline(uint256 deadline) {
         require(block.timestamp < deadline, "Signed transaction expired");
         _;
@@ -51,6 +57,10 @@ contract Elections is Ownable {
      * Contract initialization
      */
 
+    /// @notice Contract's constructor
+    /// @param votingStart Voting period start time in seconds since the Epoch
+    /// @param votingEnd Voting period end time in seconds since the Epoch
+    /// @param options Voting options' names
     constructor(uint votingStart, uint votingEnd, string[] memory options) {
         for (uint i = 0; i < options.length; i++) {
             votingOptions.push(VoteOption({name: options[i], votes: 0}));
@@ -69,6 +79,13 @@ contract Elections is Ownable {
      * External functions
      */
     
+    /// @notice Voting through EIP-712
+    /// @param v Component of the signature
+    /// @param r Component of the signature
+    /// @param s Component of the signature
+    /// @param sender Declared signature signer
+    /// @param deadline Declared deadline, after which the tx should expire
+    /// @param voteOption Declared vote option index
     function eip712Vote(
         uint8 v,
         bytes32 r,
@@ -94,6 +111,8 @@ contract Elections is Ownable {
         _vote(sender, voteOption);
     }
 
+    /// @notice Voting directly
+    /// @param voteOption Vote option index
     function vote(uint voteOption) external {
         _vote(msg.sender, voteOption);
     }
@@ -102,8 +121,9 @@ contract Elections is Ownable {
      * Queries
      */
 
-    /// @dev Computes the winning option taking all
-    /// previous votes into account.
+    /// @notice Finds the index of the currently winning option
+    /// @dev Computes the winning option taking all previous votes into account.
+    /// @return _winningOptionIndex Winning option index
     function winningOptionIndex() public view returns (uint _winningOptionIndex)
     {
         uint winningVoteCount = 0;
@@ -115,22 +135,29 @@ contract Elections is Ownable {
         }
     }
 
-    // Calls winningProposal() function to get the index
-    // of the winner contained in the proposals array and then
-    // returns the name of the winner
+    /// @notice Finds the winning option
+    /// @dev Calls winningProposal() function to get the index
+    /// of the winner contained in the proposals array and then
+    /// returns the winning option object
+    /// @return voteOption Object
     function winningOption() external view returns (VoteOption memory)
     {
         return votingOptions[winningOptionIndex()];
     }
 
-    /// Returns all voting options and its' data
+    /// @notice All declared voting options
+    /// @dev Returns all voting options and its' data
+    /// @return Array of voting option objects
     function getVotingOptions() public view returns (VoteOption[] memory)
     {
         return votingOptions;
     }
 
-    /// Returns the registered voters
+    /// @notice Returns the registered voters
     /// @dev Pagination is used to prevent failure on large address sets
+    /// @param start An offset from where to start paginating
+    /// @param limit An amount of addresses to return
+    /// @return A set of addresses of the registered voters
     function getRegisteredVoters(uint start, uint limit) public view returns(address[] memory)
     {
         uint size = (limit > registeredVoters.length - start) ? registeredVoters.length - start : limit;
@@ -146,6 +173,13 @@ contract Elections is Ownable {
      * Owner only
      */
     
+    /// @notice Registering a new voter through EIP-712
+    /// @param v Component of the signature
+    /// @param r Component of the signature
+    /// @param s Component of the signature
+    /// @param sender Declared signature signer
+    /// @param deadline Declared deadline, after which the tx should expire
+    /// @param addr Declared address to be registsered as a voter
     function eip712RegisterVoter(
         uint8 v,
         bytes32 r,
@@ -175,10 +209,20 @@ contract Elections is Ownable {
         _registerVoters(addresses);
     }
 
+    /// @notice Registering new voters directly
+    /// @param addresses A set of addresses to be registsered as voters
     function registerVoters(address[] memory addresses) onlyOwner external {
         _registerVoters(addresses);
     }
 
+    /// @notice Changing voting period through EIP-712
+    /// @param v Component of the signature
+    /// @param r Component of the signature
+    /// @param s Component of the signature
+    /// @param sender Declared signature signer
+    /// @param deadline Declared deadline, after which the tx should expire
+    /// @param votingStart Declared voting period start time in seconds since the Epoch
+    /// @param votingEnd Declared voting period end time in seconds since the Epoch
     function eip712SetVotingPeriod(
         uint8 v,
         bytes32 r,
@@ -208,6 +252,9 @@ contract Elections is Ownable {
         _setVotingPeriod(votingStart, votingEnd);
     }
 
+    /// @notice Changing voting period directly
+    /// @param votingStart Voting period start time in seconds since the Epoch
+    /// @param votingEnd Voting period end time in seconds since the Epoch
     function setVotingPeriod(uint votingStart, uint votingEnd) onlyOwner external {
         _setVotingPeriod(votingStart, votingEnd);
     }
@@ -216,6 +263,13 @@ contract Elections is Ownable {
      * Internal functions
      */
 
+    /// @notice Validating the built-up hash against the v, r, s components
+    /// @dev Recovering the signer of the signature and comparing it to the declared signer
+    /// @param v Component of the signature
+    /// @param r Component of the signature
+    /// @param s Component of the signature
+    /// @param sender Declared signature signer
+    /// @param hashStruct A built-up hash on-chain
     function _validate(
         uint8 v,
         bytes32 r,
@@ -229,6 +283,10 @@ contract Elections is Ownable {
         require(signer != address(0), "ECDSA: invalid signature");
     }
 
+    /// @notice EIP-712 Domain on-chain creation function
+    /// @dev Builds up a static domain for this contract
+    /// in order to use it with the parametric hash
+    /// @return eip712DomainHash A part of the signature hash
     function _computeEIP712DomainHash() internal view returns (bytes32 eip712DomainHash) {
         uint chainId;
         assembly {
@@ -247,6 +305,10 @@ contract Elections is Ownable {
         );  
     }
 
+    /// @notice Vote logic
+    /// @dev Internal function that implements the voting logic
+    /// @param sender Voter address
+    /// @param voteOption Vote option index
     function _vote(address sender, uint voteOption) internal duringVoting {
         Voter storage voter = voters[sender];
         require(voter.registered, "Has no right to vote");
@@ -262,6 +324,9 @@ contract Elections is Ownable {
         emit Vote(sender, voteOption);
     }
 
+    /// @notice Register voters logic
+    /// @dev Internal function that implements the register voters
+    /// @param addresses A set of addresses to be registsered as voters
     function _registerVoters(address[] memory addresses) internal beforeVoting {
         for (uint i = 0; i < addresses.length; i++) {
             Voter memory voter = Voter({
@@ -276,6 +341,10 @@ contract Elections is Ownable {
         }
     }
 
+    /// @notice Change voting period logic
+    /// @dev Internal function that implements the change voting period logic
+    /// @param votingStart Voting period start time in seconds since the Epoch
+    /// @param votingEnd Voting period end time in seconds since the Epoch
     function _setVotingPeriod(uint votingStart, uint votingEnd) internal beforeVoting {
         require(block.timestamp < votingStart, "Start date is in the past");
         require(votingStart < votingEnd, "Invalid dates passed");
