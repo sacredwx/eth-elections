@@ -211,6 +211,7 @@ function App() {
         <div className="App">
           <Grid container>
             <Grid item xs={4}>
+              <b>Registered Voters:</b><br />
               {registeredVoters?.map((address: string) => (
                 <>
                   {address}
@@ -222,7 +223,9 @@ function App() {
               <div className="row">
                 {votingParameters &&
                   <>
+                    <b>
                     Voting Process Duration:
+                    </b>
                     <br />
                     {new Date(votingParameters.start * 1000).toISOString()}
                     {`(${votingParameters.start})`}
@@ -232,13 +235,16 @@ function App() {
                   </>
                 }
               </div>
+              <br />
+              <b>Voting Results:</b>
+              <br />
               {voter?.registered === false &&
-                <Typography sx={{ color: 'red' }}>
+                <Typography sx={{ color: 'red', fontWeight: 'bold' }}>
                   You have no right to vote
                 </Typography>
               }
               {voter?.voted && votingOptions &&
-                <Typography sx={{ color: 'green' }}>
+                <Typography sx={{ color: 'green', fontWeight: 'bold' }}>
                   Your vote is: {votingOptions[voter.vote].name}
                 </Typography>
               }

@@ -202,7 +202,7 @@ contract Elections is Ownable {
 
         _validate(v, r, s, sender, hashStruct);
 
-        require (sender == owner(), "Unauthorized action!");
+        require (sender == owner(), "Unauthorized action!"); // Owner authentication
 
         address[] memory addresses = new address[](1);
         addresses[0] = addr;
@@ -247,7 +247,7 @@ contract Elections is Ownable {
 
         _validate(v, r, s, sender, hashStruct);
 
-        require (sender == owner(), "Unauthorized action!");
+        require (sender == owner(), "Unauthorized action!"); // Owner authentication
 
         _setVotingPeriod(votingStart, votingEnd);
     }
