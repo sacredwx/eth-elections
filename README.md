@@ -18,17 +18,24 @@ cd eth-elections
 npm install
 ```
 
-Once installed, let's run Hardhat's testing network:
+Once installed, let's run Hardhat's testing network (Optional, if you run locally):
 
 ```sh
 npx hardhat node --hostname 127.0.0.1
 ```
 
-Then, on a new terminal, go to the repository's root folder and run this to
-deploy your contract:
+Otherwise, you would want to add an .env file to the project's root folder:
 
 ```sh
-npx hardhat run scripts/deploy.js --network localhost
+INFURA_PROJECT_ID=
+PRIVATE_KEY=
+```
+
+Then, on a new terminal, go to the repository's root folder and run this to
+deploy your contract to the network of your choice (localhost / goerli):
+
+```sh
+npx hardhat run scripts/deploy.js --network {network}
 ```
 
 A .env file is located in 'backend/.env'
